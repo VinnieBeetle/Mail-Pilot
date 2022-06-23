@@ -1,0 +1,335 @@
+<!--
+Vincent Ho
+mailPilot.html
+12/2/21
+To amazon prime some packages
+1) Points!
+2) DIFFICULTY!
+3) heart power up! - takes 30 secs to respawn
+-->
+
+
+<!DOCTYPE HTML>
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <title>mailPilot</title>
+    <script type="text/javascript"
+            src = "simpleGame.js"></script>
+    <script type="text/javascript">
+    
+    //game sprites
+    var scene;
+    var plane;
+    var island;
+    var clouds;
+    var ocean;
+	var heart;
+    
+    //sounds
+    var yayMp3;
+    var yayOgg;
+    var thunderMp3;
+    var thunderOgg;
+    var engineMp3;
+    var engineOgg;
+	var collect;
+    
+    //constants
+    var OCEAN_SPEED = 10;
+    var NUM_CLOUDS = 3;
+    var POINTS = 0;
+	var LIVES = 3;
+	var DIFFICULTY;
+	var timer;
+	var time;
+	
+	
+    function Plane(){
+        tPlane = new Sprite(scene, "plane.gif", 50, 50);
+        tPlane.setSpeed(0);
+        tPlane.setPosition()
+        
+        tPlane.followMouse = function(){
+            this.setPosition(scene.getMouseX(), 500);
+        }
+        
+        return tPlane;
+    } // end plane constructor
+	
+	function Heart(){
+        tHeart = new Sprite(scene, "heart.png", 50, 50);
+        
+        tHeart.reset = function(){
+			this.show();
+            this.setDY(OCEAN_SPEED);
+            this.setDX(0);
+            newX = Math.random() * scene.width;
+            this.setPosition(newX, 50);
+			this.setBoundAction(DIE);
+			
+        } // end reset
+		
+		tHeart.checkBounds = function(){
+            if (this.y > scene.height){
+                tHeart.hide();
+            } // end if
+        } // end checkBounds
+        
+        tHeart.reset();
+        
+        return tHeart;
+    } // end heart
+    
+	
+	
+    function Island(){
+        tIsland = new Sprite(scene, "island.gif", 100, 100);
+        
+        tIsland.reset = function(){
+            this.setDY(OCEAN_SPEED);
+            this.setDX(0);
+            newX = Math.random() * scene.width;
+            this.setPosition(newX, 50);
+        } // end reset
+        
+        tIsland.checkBounds = function(){
+            if (this.y > scene.height){
+                this.reset();
+            } // end if
+        } // end checkBounds
+        
+        tIsland.reset();
+        
+        return tIsland;
+    } // end island
+    
+    function Cloud(){
+        tCloud = new Sprite(scene, "Cloud.gif", 150, 100);
+        
+        tCloud.reset = function(){
+            this.setDY((Math.random() * OCEAN_SPEED) + 5);
+            this.setDX((Math.random() * 10) - 5);
+            newX = Math.random() * scene.width;
+            this.setPosition(newX, 50);
+        } // end reset
+        
+        tCloud.checkBounds = function(){
+            if (this.y > scene.height){
+                this.reset();
+            } // end if
+        } // end checkBounds
+        
+        tCloud.reset();
+        
+        return tCloud;
+    } // end cloud 
+    
+    function makeClouds(){
+        clouds = new Array(NUM_CLOUDS);
+        for (i = 0; i < NUM_CLOUDS; i++){
+            clouds[i] = new Cloud();
+        } // end for
+    } // end makeClouds
+    
+    function updateClouds(){
+        for (i = 0; i < NUM_CLOUDS; i++){
+            clouds[i].update();
+        } // end for
+    } // end updateClouds
+    
+    function Ocean(){
+        tOcean = new Sprite(scene, "ocean.gif", 800, 1440);
+        tOcean.setDX(0);
+        tOcean.setDY(OCEAN_SPEED);
+        tOcean.setPosition(400, 300);
+        
+        tOcean.checkBounds = function(){
+           //seamless ocean gif repeats
+        
+            if (this.y > 720){
+                this.setPosition(400, -120)
+            } // end if
+        } // end checkBounds
+        
+        tOcean.checkKeys = function(){
+            //used for testing ocean position
+            if (keysDown[K_UP]){
+                this.changeYby(-1);
+            }
+            if (keysDown[K_DOWN]){
+                this.changeYby(1);
+            }
+            console.log("Ocean Y value: " + this.y);
+        } // end checkKeys
+        
+        return tOcean;
+    } // end ocean
+    
+    buildSounds = function(){
+        yayMp3 = new Sound("yay.mp3");
+        yayOgg = new Sound("yay.ogg");
+        
+        thunderMp3 = new Sound("thunder.mp3");
+        thunderOgg = new Sound("thunder.ogg");
+        
+        engineMp3 = new Sound("engine.mp3");
+        engineOgg = new Sound("engine.ogg");
+		
+		collect = new Sound("collect.mp3");
+        
+    } // end buildSounds
+    
+    function checkCollisions(){
+        //plane on island
+        if (plane.collidesWith(island)){
+			POINTS += 1;
+			updateScore();
+            yayOgg.play();
+            yayMp3.play();
+            island.reset();
+        } // end if
+		
+		//plane on heart
+		if (plane.collidesWith(heart)){
+			LIVES += 1;
+			updateScore();
+			collect.play();
+			heart.hide();
+        } // end if
+        
+        //plane on cloud
+        for (i = 0; i < NUM_CLOUDS; i++){
+            if (plane.collidesWith(clouds[i])){
+				if(DIFFICULTY == 1){
+					POINTS -= 1;
+					updateScore();
+				}
+				if(DIFFICULTY == 2){
+					POINTS -= 2;
+					updateScore();
+				}
+				LIVES -= 1;
+                thunderOgg.play();
+                thunderMp3.play();
+                clouds[i].reset();
+            } // end if
+        } // end for
+    } // end checkCollisions
+    
+    function init(){
+        scene = new Scene();
+        scene.hideCursor();
+		scoreBoard = document.getElementById("scoreBoard");
+		POINTS = 0;
+		DIFFICULTY = 0;
+		timer = new Timer();
+        
+        //add virtual joystick if possible
+        if (scene.touchable){
+            joy = new Joy();
+        } // end if
+        
+        buildSounds();
+        
+        plane = new Plane();
+        island = new Island();
+		heart = new Heart();
+        makeClouds();
+        ocean = new Ocean();
+        
+        scene.start();
+    }  // end init
+    
+    function update(){
+        engineOgg.play();
+        engineMp3.play();
+        
+        scene.clear();
+        
+        plane.followMouse();
+        
+        checkCollisions();
+		
+		checkTime();
+            
+        ocean.update();
+        island.update();
+        plane.update();
+		heart.update();
+        updateClouds();
+        
+    } // end update();
+    
+	function updateScore(){
+		//update the scoreboard
+		scoreBoard.innerHTML = "Points: " + POINTS + ". Lives: " + LIVES;
+	} // end updateScore
+	
+	function easy(){
+		DIFFICULTY = 0;
+		POINTS = 0;
+		updateScore();
+		NUM_CLOUDS = 3;
+		makeClouds();
+		
+	}
+	
+	function medium(){
+		DIFFICULTY = 1;
+		POINTS = 0;
+		updateScore();
+		NUM_CLOUDS = 4;
+		makeClouds();
+	}
+	
+	function hard(){
+		DIFFICULTY = 2;
+		POINTS = 0;
+		updateScore();
+		NUM_CLOUDS = 5;
+		makeClouds();
+	}
+	
+	function checkTime(){
+			 time = timer.getElapsedTime();
+			 if (time > 30){
+				heart.reset();
+				timer.reset();
+			}// end if -- checks for timed challenge
+			if (LIVES < 1){
+				scene.stop();
+			}
+		updateScore();
+	} // end checkTime
+	
+	function restart(){
+			document.location.href = "";
+	} // end restart
+	
+	
+    </script>
+</head>
+<body onload = "init()">
+    <div id = "scoreBoard">Points: 0. Lives: 3</div>
+	<div id = "difficulty">
+		 <button type = "button"
+		 onclick = "easy()">
+			Easy
+		 </button>
+		 <button type = "button"
+		 onclick = "medium()">
+			Medium
+		 </button>
+		 <button type = "button"
+		 onclick = "hard()">
+			Hard
+		 </button>
+		 <button type = "button"
+		 onclick = "restart()">
+			Reset
+		 </button>
+	 </div>
+	
+</body>
+</html>
